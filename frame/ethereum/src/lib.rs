@@ -64,6 +64,7 @@ use fp_evm::{
 	CallOrCreateInfo, CheckEvmTransaction, CheckEvmTransactionConfig, TransactionValidationError,
 };
 pub use fp_rpc::TransactionStatus;
+pub use fp_rent::EvmRentCalculator;
 use fp_storage::{EthereumStorageSchema, PALLET_ETHEREUM_SCHEMA};
 use pallet_evm::{BlockHashMapping, FeeCalculator, GasWeightMapping, Runner};
 
@@ -489,6 +490,43 @@ impl<T: Config> Pallet<T> {
 		}
 	}
 
+	fn calculate_max_transaction_fee(
+		transaction_data: &TransactionData,
+	) -> Result<U256, TransactionValidityError> {
+		match (
+			transaction_data.gas_price,
+			transaction_data.max_fee_per_gas,
+			transaction_data.max_priority_fee_per_gas,
+		) {
+			// Legacy or EIP-2930 transaction
+			(Some(gas_price), None, None) => {
+				Ok(gas_price.saturating_mul(transaction_data.gas_limit))
+			},
+
+			// EIP-1559 transaction without tip
+			(None, Some(max_fee_per_gas), None) => {
+				Ok(max_fee_per_gas.saturating_mul(transaction_data.gas_limit))
+			},
+
+			// EIP-1559 with tip
+			(None, Some(max_fee_per_gas), Some(max_priority_fee_per_gas)) => {
+				if max_priority_fee_per_gas > max_fee_per_gas {
+					return Err(TransactionValidityError::Invalid(
+						InvalidTransaction::Custom(TransactionValidationError::PriorityFeeTooHigh as u8)
+					));
+				}
+				Ok(max_fee_per_gas.saturating_mul(transaction_data.gas_limit))
+			}
+
+			_ => {
+				// must be transactional tx
+				Err(TransactionValidityError::Invalid(
+					InvalidTransaction::Custom(TransactionValidationError::InvalidFeeInput as u8)
+				))
+			}
+		}
+	}
+
 	// Controls that must be performed by the pool.
 	// The controls common with the State Transition Function (STF) are in
 	// the function `validate_transaction_common`.
@@ -519,6 +557,22 @@ impl<T: Config> Pallet<T> {
 			.and_then(|v| v.with_base_fee())
 			.and_then(|v| v.with_balance_for(&who))
 			.map_err(|e| e.0)?;
+
+		let rent_amount = T::EvmRentCalculator::estimate_rent(origin).0;
+		if rent_amount > 0 {
+			let fee = Self::calculate_max_transaction_fee(&transaction_data)?;
+
+			let total_payment = transaction_data.value.saturating_add(fee);
+			let total_with_rent = total_payment.saturating_add(U256::from(rent_amount));
+
+			if who.balance < total_with_rent {
+				return Err(
+					TransactionValidityError::Invalid(
+						InvalidTransaction::Custom(TransactionValidationError::InsufficientRent as u8)
+					)
+				);
+			}
+		}
 
 		// EIP-3607: https://eips.ethereum.org/EIPS/eip-3607
 		// Do not allow transactions for which `tx.sender` has any code deployed.
@@ -948,7 +1002,7 @@ impl<T: Config> Pallet<T> {
 				chain_id: T::ChainId::get(),
 				is_transactional: true,
 			},
-			transaction_data.into(),
+			transaction_data.clone().into(),
 			weight_limit,
 			proof_size_base_cost,
 		)
@@ -957,6 +1011,22 @@ impl<T: Config> Pallet<T> {
 			.and_then(|v| v.with_base_fee())
 			.and_then(|v| v.with_balance_for(&who))
 			.map_err(|e| TransactionValidityError::Invalid(e.0))?;
+
+		let rent_amount = T::EvmRentCalculator::estimate_rent(origin).0;
+		if rent_amount > 0 {
+			let fee = Self::calculate_max_transaction_fee(&transaction_data)?;
+
+			let total_payment = transaction_data.value.saturating_add(fee);
+			let total_with_rent = total_payment.saturating_add(U256::from(rent_amount));
+
+			if who.balance < total_with_rent {
+				return Err(
+					TransactionValidityError::Invalid(
+						InvalidTransaction::Custom(TransactionValidationError::InsufficientRent as u8)
+					)
+				);
+			}
+		}
 
 		Ok(())
 	}
@@ -1093,6 +1163,9 @@ impl From<TransactionValidationError> for InvalidTransactionWrapper {
 			),
 			TransactionValidationError::GasPriceTooLow => InvalidTransactionWrapper(
 				InvalidTransaction::Custom(TransactionValidationError::GasPriceTooLow as u8),
+			),
+			TransactionValidationError::InsufficientRent => InvalidTransactionWrapper(
+				InvalidTransaction::Custom(TransactionValidationError::InsufficientRent as u8),
 			),
 			TransactionValidationError::UnknownError => InvalidTransactionWrapper(
 				InvalidTransaction::Custom(TransactionValidationError::UnknownError as u8),

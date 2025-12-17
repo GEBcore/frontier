@@ -48,6 +48,7 @@ impl Geth {
 						"max priority fee per gas higher than max fee per gas".into()
 					}
 					VError::InvalidFeeInput => "invalid fee input".into(),
+					VError::InsufficientRent => "insufficient balance for rent + gas * price + value".into(),
 					_ => "transaction validation error".into(),
 				},
 				_ => "unknown error".into(),

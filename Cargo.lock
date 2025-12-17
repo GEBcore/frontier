@@ -3153,6 +3153,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "fp-rent"
+version = "2.0.0-dev"
+dependencies = [
+ "sp-core",
+]
+
+[[package]]
 name = "fp-rpc"
 version = "3.0.0-dev"
 dependencies = [
@@ -6143,6 +6150,7 @@ dependencies = [
  "fp-consensus",
  "fp-ethereum",
  "fp-evm",
+ "fp-rent",
  "fp-rpc",
  "fp-self-contained",
  "fp-storage",
@@ -6170,6 +6178,7 @@ dependencies = [
  "evm",
  "fp-account",
  "fp-evm",
+ "fp-rent",
  "frame-benchmarking",
  "frame-support",
  "frame-system",
@@ -6303,6 +6312,22 @@ dependencies = [
  "pallet-evm-test-vector-support",
  "ripemd",
  "sp-io",
+]
+
+[[package]]
+name = "pallet-evm-rent"
+version = "1.0.0"
+dependencies = [
+ "fp-rent",
+ "frame-support",
+ "frame-system",
+ "pallet-timestamp",
+ "parity-scale-codec",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "sp-std",
 ]
 
 [[package]]

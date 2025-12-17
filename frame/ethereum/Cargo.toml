@@ -29,6 +29,7 @@ fp-evm = { workspace = true }
 fp-rpc = { workspace = true }
 fp-storage = { workspace = true }
 pallet-evm = { workspace = true }
+fp-rent = { workspace = true }
 
 [dev-dependencies]
 hex = { workspace = true }
@@ -64,6 +65,7 @@ std = [
 	"fp-self-contained/std",
 	"fp-storage/std",
 	"pallet-evm/std",
+	"fp-rent/std",
 ]
 runtime-benchmarks = [
 	"frame-support/runtime-benchmarks",
