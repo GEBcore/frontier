@@ -103,6 +103,8 @@ pub use fp_evm::{
 	PrecompileOutput, PrecompileResult, PrecompileSet, TransactionValidationError, Vicinity,
 };
 
+pub use fp_rent::EvmRentCalculator;
+
 pub use self::{
 	pallet::*,
 	runner::{Runner, RunnerError},
@@ -174,6 +176,9 @@ pub mod pallet {
 
 		/// Get the timestamp for the current block.
 		type Timestamp: Time;
+
+		/// Charge(Burn) evm rent
+		type EvmRentCalculator: EvmRentCalculator;
 
 		/// Weight information for extrinsics in this pallet.
 		type WeightInfo: WeightInfo;
@@ -500,6 +505,8 @@ pub mod pallet {
 		Reentrancy,
 		/// EIP-3607,
 		TransactionMustComeFromEOA,
+		/// Insufficient Rent + Fee + Value
+		InsufficientRent,
 		/// Undefined error.
 		Undefined,
 	}
@@ -517,6 +524,7 @@ pub mod pallet {
 				TransactionValidationError::InvalidFeeInput => Error::<T>::GasPriceTooLow,
 				TransactionValidationError::InvalidChainId => Error::<T>::InvalidChainId,
 				TransactionValidationError::InvalidSignature => Error::<T>::InvalidSignature,
+				TransactionValidationError::InsufficientRent => Error::InsufficientRent,
 				TransactionValidationError::UnknownError => Error::<T>::Undefined,
 			}
 		}
@@ -986,10 +994,46 @@ impl<T, C, OU> OnChargeEVMTransaction<T> for EVMCurrencyAdapter<C, OU>
 	type LiquidityInfo = Option<NegativeImbalanceOf<C, T>>;
 
 	fn withdraw_fee(who: &H160, fee: U256) -> Result<Self::LiquidityInfo, Error<T>> {
+		// ====================================================
+		// Handle EVM Rent (burn logic)
+
+		// 1. H160 -> T::AccountId
+		let account_id = T::AddressMapping::into_account_id(*who);
+
+		// 2. call process_rent get rent to burn and update state
+		let rent_to_burn_u128 = T::EvmRentCalculator::process_rent(*who);
+		if rent_to_burn_u128 > 0 {
+			let rent_balance: C::Balance = rent_to_burn_u128.unique_saturated_into();
+
+			// Withdraw
+			// WithdrawReasons::FEE
+			// ExistenceRequirement::AllowDeath
+			match C::withdraw(
+				&account_id,
+				rent_balance,
+				WithdrawReasons::FEE,
+				ExistenceRequirement::AllowDeath
+			) {
+				Ok(rent_imbalance) => {
+					// !!! KeyPoint: Burn !!!
+					// rent_imbalance is NegativeImbalance
+					// We don't call resolve_creating or deposit_into_existing.
+					// We do nothing and just let it drop here.
+					// Substrate automatically reduces TotalIssuance when rent_imbalance goes out of scope.
+					drop(rent_imbalance);
+				},
+				Err(_) => {
+					// The transaction fails if the balance is insufficient to pay the rent.
+					return Err(Error::<T>::BalanceLow);
+				}
+			}
+		}
+		// ====================================================
+
 		if fee.is_zero() {
 			return Ok(None);
 		}
-		let account_id = T::AddressMapping::into_account_id(*who);
+
 		let imbalance = C::withdraw(
 			&account_id,
 			fee.unique_saturated_into(),

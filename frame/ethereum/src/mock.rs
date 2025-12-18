@@ -177,6 +177,7 @@ impl pallet_evm::Config for Test {
 	type GasLimitPovSizeRatio = GasLimitPovSizeRatio;
 	type SuicideQuickClearLimit = SuicideQuickClearLimit;
 	type Timestamp = Timestamp;
+	type EvmRentCalculator = ();
 	type WeightInfo = ();
 }
 

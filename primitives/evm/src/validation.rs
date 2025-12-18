@@ -78,6 +78,8 @@ pub enum TransactionValidationError {
 	InvalidChainId,
 	/// The transaction signature is invalid
 	InvalidSignature,
+	/// Insufficient rent for the transaction
+	InsufficientRent,
 	/// Unknown error
 	#[num_enum(default)]
 	UnknownError,
@@ -260,6 +262,7 @@ mod tests {
 		InvalidFeeInput,
 		InvalidChainId,
 		InvalidSignature,
+		InsufficientRent,
 		UnknownError,
 	}
 
@@ -278,6 +281,7 @@ mod tests {
 				TransactionValidationError::InvalidFeeInput => TestError::InvalidFeeInput,
 				TransactionValidationError::InvalidChainId => TestError::InvalidChainId,
 				TransactionValidationError::InvalidSignature => TestError::InvalidSignature,
+				TransactionValidationError::InsufficientRent => TestError::InsufficientRent,
 				TransactionValidationError::UnknownError => TestError::UnknownError,
 			}
 		}
