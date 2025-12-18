@@ -12,7 +12,7 @@ repository = { workspace = true }
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
-scale-codec = { package = "parity-scale-codec", workspace = true }
+scale-codec = { workspace = true }
 scale-info = { workspace = true }
 
 # Substrate
@@ -21,6 +21,7 @@ sp-block-builder = { workspace = true }
 sp-consensus-aura = { workspace = true }
 sp-core = { workspace = true }
 sp-inherents = { workspace = true }
+sp-io = { workspace = true }
 sp-offchain = { workspace = true }
 sp-runtime = { workspace = true }
 sp-session = { workspace = true }
@@ -57,6 +58,12 @@ pallet-evm-precompile-modexp = { workspace = true }
 pallet-evm-precompile-sha3fips = { workspace = true }
 pallet-evm-precompile-simple = { workspace = true }
 pallet-hotfix-sufficients = { workspace = true }
+pallet-evm-rent = { workspace = true }
+
+fp-rpc-debug = { workspace = true }
+fp-rpc-txpool = { workspace = true }
+fp-rpc-evm-tracing-events = { workspace = true, optional = true }
+evm-tracer = { workspace = true, optional = true }
 
 [build-dependencies]
 substrate-wasm-builder = { workspace = true, optional = true }
@@ -100,6 +107,12 @@ std = [
 	"fp-evm/std",
 	"fp-rpc/std",
 	"fp-self-contained/std",
+
+	"fp-rpc-debug/std",
+	"fp-rpc-txpool/std",
+	"evm-tracer/std",
+	"fp-rpc-evm-tracing-events/std",
+
 	# Frontier FRAME
 	"pallet-base-fee/std",
 	"pallet-dynamic-fee/std",
@@ -110,6 +123,7 @@ std = [
 	"pallet-evm-precompile-sha3fips/std",
 	"pallet-evm-precompile-simple/std",
 	"pallet-hotfix-sufficients/std",
+	"pallet-evm-rent/std",
 ]
 runtime-benchmarks = [
 	"frame-benchmarking/runtime-benchmarks",
@@ -122,4 +136,11 @@ runtime-benchmarks = [
 	"pallet-ethereum/runtime-benchmarks",
 	"pallet-evm/runtime-benchmarks",
 	"pallet-hotfix-sufficients/runtime-benchmarks",
+]
+
+evm-tracing = [
+	"evm-tracer",
+	"sp-io/disable_oom",
+	"sp-io/disable_panic_handler",
+	"fp-rpc-evm-tracing-events",
 ]

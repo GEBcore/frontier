@@ -19,7 +19,7 @@ pub type Client = FullClient<frontier_template_runtime::RuntimeApi, TemplateRunt
 pub type HostFunctions = frame_benchmarking::benchmarking::HostFunctions;
 /// Otherwise we use empty host functions for ext host functions.
 #[cfg(not(feature = "runtime-benchmarks"))]
-pub type HostFunctions = ();
+pub type HostFunctions = fp_ext::tracing_ext::HostFunctions;
 
 pub struct TemplateRuntimeExecutor;
 impl NativeExecutionDispatch for TemplateRuntimeExecutor {

@@ -10,9 +10,10 @@ use sc_client_api::{
 use sc_network::NetworkService;
 use sc_network_sync::SyncingService;
 use sc_rpc::SubscriptionTaskExecutor;
+use sc_service::TaskManager;
 use sc_transaction_pool::{ChainApi, Pool};
 use sc_transaction_pool_api::TransactionPool;
-use sp_api::{CallApiAt, ProvideRuntimeApi};
+use sp_api::{CallApiAt, HeaderT, ProvideRuntimeApi};
 use sp_block_builder::BlockBuilder as BlockBuilderApi;
 use sp_blockchain::{Error as BlockChainError, HeaderBackend, HeaderMetadata};
 use sp_consensus_aura::{sr25519::AuthorityId as AuraId, AuraApi};
@@ -53,6 +54,8 @@ pub struct EthDeps<B: BlockT, C, P, A: ChainApi, CT, CIDP> {
 	pub filter_pool: Option<FilterPool>,
 	/// Maximum number of logs in a query.
 	pub max_past_logs: u32,
+	/// Timeout for eth logs query in seconds. (default 10)
+	pub logs_request_timeout: u64,
 	/// Fee history cache.
 	pub fee_history_cache: FeeHistoryCache,
 	/// Maximum fee history cache size.
@@ -64,6 +67,24 @@ pub struct EthDeps<B: BlockT, C, P, A: ChainApi, CT, CIDP> {
 	pub forced_parent_hashes: Option<BTreeMap<H256, H256>>,
 	/// Something that can create the inherent data providers for pending state
 	pub pending_create_inherent_data_providers: CIDP,
+
+	pub tracing_config: TracingConfig,
+}
+
+pub struct TracingSpawnTasksParams<'a, B: BlockT, C, BE> {
+	pub task_manager: &'a TaskManager,
+	pub client: Arc<C>,
+	pub substrate_backend: Arc<BE>,
+	pub frontier_backend: fc_db::Backend<B>,
+	pub filter_pool: Option<FilterPool>,
+	pub overrides: Arc<OverrideHandle<B>>,
+	pub fee_history_limit: u64,
+	pub fee_history_cache: FeeHistoryCache,
+}
+
+pub struct TracingConfig {
+	pub tracing_requesters: crate::tracing::RpcRequesters,
+	pub trace_filter_max_count: u32,
 }
 
 /// Instantiate Ethereum-compatible RPC extensions.
@@ -79,11 +100,14 @@ pub fn create_eth<B, C, BE, P, A, CT, CIDP, EC>(
 ) -> Result<RpcModule<()>, Box<dyn std::error::Error + Send + Sync>>
 where
 	B: BlockT<Hash = H256>,
+	B::Header: HeaderT<Number = u32>,
 	C: CallApiAt<B> + ProvideRuntimeApi<B>,
 	C::Api: AuraApi<B, AuraId>
 		+ BlockBuilderApi<B>
 		+ ConvertTransactionRuntimeApi<B>
 		+ EthereumRuntimeRPCApi<B>,
+	C::Api: fp_rpc_debug::DebugRuntimeApi<B>,
+	C::Api: fp_rpc_txpool::TxPoolRuntimeApi<B>,
 	C: HeaderBackend<B> + HeaderMetadata<B, Error = BlockChainError>,
 	C: BlockchainEvents<B> + AuxStore + UsageProvider<B> + StorageProvider<B, BE> + 'static,
 	BE: Backend<B> + 'static,
@@ -98,8 +122,9 @@ where
 		EthFilterApiServer, EthPubSub, EthPubSubApiServer, EthSigner, Net, NetApiServer, Web3,
 		Web3ApiServer,
 	};
-	#[cfg(feature = "txpool")]
-	use fc_rpc::{TxPool, TxPoolApiServer};
+	use fc_rpc_debug::{Debug, DebugServer};
+	use fc_rpc_trace::{Trace, TraceServer};
+	use fc_rpc_txpool::{TxPool, TxPoolServer};
 
 	let EthDeps {
 		client,
@@ -115,11 +140,13 @@ where
 		block_data_cache,
 		filter_pool,
 		max_past_logs,
+		logs_request_timeout,
 		fee_history_cache,
 		fee_history_cache_limit,
 		execute_gas_limit_multiplier,
 		forced_parent_hashes,
 		pending_create_inherent_data_providers,
+		tracing_config
 	} = deps;
 
 	let mut signers = Vec::new();
@@ -159,11 +186,29 @@ where
 				filter_pool,
 				500_usize, // max stored filters
 				max_past_logs,
+				logs_request_timeout,
 				block_data_cache,
 			)
 			.into_rpc(),
 		)?;
 	}
+
+	if let Some(trace_filter_requester) = tracing_config.tracing_requesters.trace {
+		io.merge(
+			Trace::new(client.clone(), trace_filter_requester, tracing_config.trace_filter_max_count)
+				.into_rpc(),
+		)
+			.ok();
+	}
+
+	if let Some(debug_requester) = tracing_config.tracing_requesters.debug {
+		io.merge(Debug::new(debug_requester).into_rpc()).ok();
+	}
+
+	io.merge(
+		TxPool::new(Arc::clone(&client),
+		graph.clone()).into_rpc()
+	).ok();
 
 	io.merge(
 		EthPubSub::new(
@@ -188,9 +233,6 @@ where
 	)?;
 
 	io.merge(Web3::new(client.clone()).into_rpc())?;
-
-	#[cfg(feature = "txpool")]
-	io.merge(TxPool::new(client, graph).into_rpc())?;
 
 	Ok(io)
 }

@@ -24,7 +24,10 @@ use crate::{
 	eth::{
 		new_frontier_partial, spawn_frontier_tasks, BackendType, EthCompatRuntimeApiCollection,
 		FrontierBackend, FrontierBlockImport, FrontierPartialComponents,
+		EthApi as EthApiCmd
 	},
+	tracing::{spawn_tracing_tasks, RpcRequesters},
+	rpc::{TracingConfig, TracingSpawnTasksParams}
 };
 pub use crate::{
 	client::{Client, TemplateRuntimeExecutor},
@@ -367,6 +370,28 @@ where
 	// for ethereum-compatibility rpc.
 	config.rpc_id_provider = Some(Box::new(fc_rpc::EthereumSubIdProvider));
 
+	let ethapi_cmd = eth_config.ethapi.clone();
+	let tracing_requesters: RpcRequesters = {
+		if ethapi_cmd.contains(&EthApiCmd::Debug) || ethapi_cmd.contains(&EthApiCmd::Trace) {
+			spawn_tracing_tasks(
+				&eth_config,
+				prometheus_registry.clone(),
+				TracingSpawnTasksParams {
+					task_manager: &task_manager,
+					client: client.clone(),
+					substrate_backend: backend.clone(),
+					frontier_backend: frontier_backend.clone(),
+					filter_pool: filter_pool.clone(),
+					overrides: overrides.clone(),
+					fee_history_limit: eth_config.fee_history_limit,
+					fee_history_cache: fee_history_cache.clone(),
+				},
+			)
+		} else {
+			RpcRequesters { debug: None, trace: None }
+		}
+	};
+
 	let rpc_builder = {
 		let client = client.clone();
 		let pool = transaction_pool.clone();
@@ -376,6 +401,7 @@ where
 		let is_authority = role.is_authority();
 		let enable_dev_signer = eth_config.enable_dev_signer;
 		let max_past_logs = eth_config.max_past_logs;
+		let logs_request_timeout = eth_config.logs_request_timeout;
 		let execute_gas_limit_multiplier = eth_config.execute_gas_limit_multiplier;
 		let filter_pool = filter_pool.clone();
 		let frontier_backend = frontier_backend.clone();
@@ -422,11 +448,16 @@ where
 				block_data_cache: block_data_cache.clone(),
 				filter_pool: filter_pool.clone(),
 				max_past_logs,
+				logs_request_timeout,
 				fee_history_cache: fee_history_cache.clone(),
 				fee_history_cache_limit,
 				execute_gas_limit_multiplier,
 				forced_parent_hashes: None,
 				pending_create_inherent_data_providers,
+				tracing_config: TracingConfig {
+					tracing_requesters: tracing_requesters.clone(),
+					trace_filter_max_count: eth_config.ethapi_trace_max_count,
+				}
 			};
 			let deps = crate::rpc::FullDeps {
 				client: client.clone(),

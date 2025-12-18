@@ -16,6 +16,7 @@ members = [
 	"frame/evm/precompile/bls12377",
 	"frame/evm/precompile/dispatch",
 	"frame/evm/precompile/curve25519",
+	"frame/evm-rent",
 	"client/api",
 	"client/consensus",
 	"client/rpc-core",
@@ -23,12 +24,26 @@ members = [
 	"client/db",
 	"client/storage",
 	"client/mapping-sync",
+	"client/bifrost/evm-tracing",
+	"client/bifrost/rpc-core/types",
+	"client/bifrost/rpc-core/trace",
+	"client/bifrost/rpc-core/debug",
+	"client/bifrost/rpc-core/txpool",
+	"client/bifrost/rpc/debug",
+	"client/bifrost/rpc/trace",
+	"client/bifrost/rpc/txpool",
 	"primitives/account",
 	"primitives/consensus",
 	"primitives/dynamic-fee",
 	"primitives/evm",
 	"primitives/rpc",
 	"primitives/self-contained",
+	"primitives/bifrost/ext",
+	"primitives/bifrost/rpc/evm-tracing-events",
+	"primitives/bifrost/rpc/debug",
+	"primitives/bifrost/rpc/txpool",
+	"primitives/rent",
+	"runtime/evm-tracer",
 	"template/node",
 	"template/runtime",
 	"precompiles",
@@ -48,9 +63,11 @@ bn = { package = "substrate-bn", version = "0.6", default-features = false }
 clap = { version = "4.4.3", features = ["derive", "deprecated"] }
 derive_more = "0.99"
 environmental = { version = "1.1.4", default-features = false }
-ethereum = { version = "0.14.0", default-features = false }
+ethereum = { version = "0.14.0", default-features = false, features = ["with-codec"] }
 ethereum-types = { version = "0.14.1", default-features = false }
-evm = { git = "https://github.com/rust-blockchain/evm", rev = "b7b82c7e1fc57b7449d6dfa6826600de37cc1e65", default-features = false }
+evm = { git = "https://github.com/bifrost-platform/evm", default-features = false, branch = "bifrost-polkadot-v1.3.0" }
+evm-gasometer = { git = "https://github.com/bifrost-platform/evm", default-features = false, branch = "bifrost-polkadot-v1.3.0" }
+evm-runtime = { git = "https://github.com/bifrost-platform/evm", default-features = false, branch = "bifrost-polkadot-v1.3.0" }
 futures = "0.3.28"
 hash-db = { version = "0.16.0", default-features = false }
 hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
@@ -65,7 +82,8 @@ num_enum = { version = "0.7.0", default-features = false }
 parity-db = "0.4.12"
 parking_lot = "0.12.1"
 rlp = { version = "0.5.2", default-features = false }
-scale-codec = { package = "parity-scale-codec", version = "3.6.4", default-features = false, features = ["derive"] }
+sha3 = { version = "0.10", default-features = false }
+scale-codec = { package = "parity-scale-codec", version = "3.6.9", default-features = false, features = ["derive"] }
 scale-info = { version = "2.9.0", default-features = false, features = ["derive"] }
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
 serde_json = "1.0"
@@ -73,78 +91,80 @@ similar-asserts = "1.1.0"
 sqlx = { version = "0.7.1", default-features = false, features = ["macros"] }
 thiserror = "1.0"
 tokio = "1.32.0"
+tracing = "0.1.34"
 
 # Substrate Client
-sc-basic-authorship = { version = "0.10.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sc-block-builder = { version = "0.10.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sc-chain-spec = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sc-cli = { version = "0.10.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-sc-client-api = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sc-client-db = { version = "0.10.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-sc-consensus = { version = "0.10.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sc-consensus-aura = { version = "0.10.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sc-consensus-grandpa = { version = "0.10.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sc-consensus-manual-seal = { version = "0.10.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sc-executor = { version = "0.10.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sc-keystore = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sc-network = { version = "0.10.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sc-network-common = { version = "0.10.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sc-network-sync = { version = "0.10.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sc-offchain = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sc-rpc = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sc-rpc-api = { version = "0.10.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sc-service = { version = "0.10.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-sc-telemetry = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sc-transaction-pool = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sc-transaction-pool-api = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sc-utils = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sc-basic-authorship = { version = "0.10.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sc-block-builder = { version = "0.10.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sc-chain-spec = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sc-cli = { version = "0.10.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sc-client-api = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sc-client-db = { version = "0.10.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sc-consensus = { version = "0.10.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sc-consensus-aura = { version = "0.10.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sc-consensus-grandpa = { version = "0.10.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sc-consensus-manual-seal = { version = "0.10.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sc-executor = { version = "0.10.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sc-keystore = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sc-network = { version = "0.10.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sc-network-common = { version = "0.10.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sc-network-sync = { version = "0.10.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sc-offchain = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sc-rpc = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sc-rpc-api = { version = "0.10.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sc-service = { version = "0.10.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sc-telemetry = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sc-transaction-pool = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sc-transaction-pool-api = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sc-utils = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
 # Substrate Primitive
-sp-api = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-sp-block-builder = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-sp-blockchain = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sp-consensus = { version = "0.10.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sp-consensus-aura = { version = "0.10.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-sp-consensus-grandpa = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-sp-core = { version = "21.0.0", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-sp-core-hashing = { version = "9.0.0", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-sp-core-hashing-proc-macro = { version = "9.0.0", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-sp-database = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sp-inherents = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-sp-io = { version = "23.0.0", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-sp-keyring = { version = "24.0.0", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-sp-offchain = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-sp-runtime = { version = "24.0.0", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-sp-runtime-interface = { version = "17.0.0", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-sp-session = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-sp-state-machine = { version = "0.28.0", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-sp-std = { version = "8.0.0", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-sp-storage = { version = "13.0.0", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-sp-timestamp = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-sp-transaction-pool = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-sp-version = { version = "22.0.0", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sp-api = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sp-block-builder = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sp-blockchain = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sp-consensus = { version = "0.10.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sp-consensus-aura = { version = "0.10.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sp-consensus-grandpa = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sp-core = { version = "21.0.0", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sp-core-hashing = { version = "9.0.0", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sp-core-hashing-proc-macro = { version = "9.0.0", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sp-database = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sp-externalities = { version = "0.19.0", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sp-inherents = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sp-io = { version = "23.0.0", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sp-keyring = { version = "24.0.0", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+sp-offchain = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sp-runtime = { version = "24.0.0", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sp-runtime-interface = { version = "17.0.0", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sp-session = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sp-state-machine = { version = "0.28.0", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sp-std = { version = "8.0.0", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sp-storage = { version = "13.0.0", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sp-timestamp = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sp-transaction-pool = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+sp-version = { version = "22.0.0", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
 # Substrate FRAME
-frame-benchmarking = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-frame-executive = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-frame-support = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-frame-system = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-frame-system-benchmarking = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-frame-system-rpc-runtime-api = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-pallet-aura = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-pallet-balances = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-pallet-grandpa = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-pallet-sudo = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-pallet-timestamp = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-pallet-transaction-payment = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-pallet-transaction-payment-rpc = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-pallet-transaction-payment-rpc-runtime-api = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
-pallet-utility = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+frame-benchmarking = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+frame-executive = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+frame-support = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+frame-system = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+frame-system-benchmarking = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+frame-system-rpc-runtime-api = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+pallet-aura = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+pallet-balances = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+pallet-grandpa = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+pallet-sudo = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+pallet-timestamp = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+pallet-transaction-payment = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+pallet-transaction-payment-rpc = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+pallet-transaction-payment-rpc-runtime-api = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
+pallet-utility = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0", default-features = false }
 # Substrate Utility
-frame-benchmarking-cli = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-prometheus-endpoint = { package = "substrate-prometheus-endpoint", version = "0.10.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-substrate-build-script-utils = { version = "3.0.0", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-substrate-frame-rpc-system = { version = "4.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-substrate-test-runtime-client = { version = "2.0.0", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
-substrate-wasm-builder = { version = "5.0.0-dev", git = "https://github.com/btclayer2/polkadot-sdk", branch = "polkadot-v1.3.0" }
+frame-benchmarking-cli = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+prometheus-endpoint = { package = "substrate-prometheus-endpoint", version = "0.10.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+substrate-build-script-utils = { version = "3.0.0", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+substrate-frame-rpc-system = { version = "4.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+substrate-test-runtime-client = { version = "2.0.0", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
+substrate-wasm-builder = { version = "5.0.0-dev", git = "https://github.com/GEBcore/polkadot-sdk", branch = "polkadot-v1.3.0" }
 
 # Frontier Client
 fc-api = { version = "1.0.0-dev", path = "client/api" }
@@ -155,6 +175,16 @@ fc-mapping-sync = { version = "2.0.0-dev", path = "client/mapping-sync", default
 fc-rpc = { version = "2.0.0-dev", path = "client/rpc", default-features = false }
 fc-rpc-core = { version = "1.1.0-dev", path = "client/rpc-core" }
 fc-storage = { version = "1.0.0-dev", path = "client/storage" }
+# Frontier BIFROST Client
+fc-evm-tracing = { version = "0.1.0", path = "client/bifrost/evm-tracing" }
+fc-rpc-core-debug = { version = "0.1.0", path = "client/bifrost/rpc-core/debug" }
+fc-rpc-core-trace = { version = "0.6.0", path = "client/bifrost/rpc-core/trace" }
+fc-rpc-core-txpool = { version = "0.6.0", path = "client/bifrost/rpc-core/txpool" }
+fc-rpc-core-types = { version = "0.1.0", path = "client/bifrost/rpc-core/types" }
+fc-rpc-debug = { version = "0.1.0", path = "client/bifrost/rpc/debug" }
+fc-rpc-trace = { version = "0.6.0", path = "client/bifrost/rpc/trace" }
+fc-rpc-txpool = { version = "0.6.0", path = "client/bifrost/rpc/txpool" }
+
 # Frontier Primitive
 fp-account = { version = "1.0.0-dev", path = "primitives/account", default-features = false }
 fp-consensus = { version = "2.0.0-dev", path = "primitives/consensus", default-features = false }
@@ -164,6 +194,15 @@ fp-evm = { version = "3.0.0-dev", path = "primitives/evm", default-features = fa
 fp-rpc = { version = "3.0.0-dev", path = "primitives/rpc", default-features = false }
 fp-self-contained = { version = "1.0.0-dev", path = "primitives/self-contained", default-features = false }
 fp-storage = { version = "2.0.0", path = "primitives/storage", default-features = false }
+fp-rent = { version = "2.0.0-dev", path = "primitives/rent", default-features = false }
+# Frontier BIFROST Primitive
+fp-ext = { version = "0.1.0", path = "primitives/bifrost/ext", default-features = false }
+fp-rpc-debug = { version = "0.1.0", path = "primitives/bifrost/rpc/debug", default-features = false }
+fp-rpc-evm-tracing-events = { version = "0.1.0", path = "primitives/bifrost/rpc/evm-tracing-events", default-features = false }
+fp-rpc-txpool = { version = "0.6.0", path = "primitives/bifrost/rpc/txpool", default-features = false }
+# Frontier Runtime
+evm-tracer = { version = "0.1.0", path = "runtime/evm-tracer", default-features = false }
+
 # Frontier FRAME
 pallet-base-fee = { version = "1.0.0", path = "frame/base-fee", default-features = false }
 pallet-dynamic-fee = { version = "4.0.0-dev", path = "frame/dynamic-fee", default-features = false }
@@ -175,6 +214,7 @@ pallet-evm-precompile-sha3fips = { version = "2.0.0-dev", path = "frame/evm/prec
 pallet-evm-precompile-simple = { version = "2.0.0-dev", path = "frame/evm/precompile/simple", default-features = false }
 pallet-evm-test-vector-support = { version = "1.0.0-dev", path = "frame/evm/test-vector-support" }
 pallet-hotfix-sufficients = { version = "1.0.0", path = "frame/hotfix-sufficients", default-features = false }
+pallet-evm-rent = { version = "1.0.0", path = "frame/evm-rent", default-features = false}
 # Frontier Template
 frontier-template-runtime = { path = "template/runtime", default-features = false }
 # Frontier Utility

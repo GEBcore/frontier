@@ -90,15 +90,15 @@ impl WeightInfo {
 		Ok(match (weight_limit, proof_size_base_cost) {
 			(None, _) => None,
 			(Some(weight_limit), Some(proof_size_base_cost))
-				if weight_limit.proof_size() >= proof_size_base_cost =>
-			{
-				Some(WeightInfo {
-					ref_time_limit: Some(weight_limit.ref_time()),
-					proof_size_limit: Some(weight_limit.proof_size()),
-					ref_time_usage: Some(0u64),
-					proof_size_usage: Some(proof_size_base_cost),
-				})
-			}
+			if weight_limit.proof_size() >= proof_size_base_cost =>
+				{
+					Some(WeightInfo {
+						ref_time_limit: Some(weight_limit.ref_time()),
+						proof_size_limit: Some(weight_limit.proof_size()),
+						ref_time_usage: Some(0u64),
+						proof_size_usage: Some(proof_size_base_cost),
+					})
+				}
 			(Some(weight_limit), None) => Some(WeightInfo {
 				ref_time_limit: Some(weight_limit.ref_time()),
 				proof_size_limit: None,
@@ -192,7 +192,9 @@ pub struct ExecutionInfoV2<T> {
 	pub value: T,
 	pub used_gas: UsedGas,
 	pub weight_info: Option<WeightInfo>,
+	/* Unique,BEVM:
 	pub logs: Vec<Log>,
+	 */
 }
 
 pub type CallInfo = ExecutionInfoV2<Vec<u8>>;
@@ -211,7 +213,9 @@ pub struct ExecutionInfo<T> {
 	pub exit_reason: ExitReason,
 	pub value: T,
 	pub used_gas: U256,
+	/* Unique,BEVM:
 	pub logs: Vec<Log>,
+	 */
 }
 
 /// Account definition used for genesis block construction.

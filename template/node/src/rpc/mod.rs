@@ -24,7 +24,7 @@ use sp_runtime::traits::Block as BlockT;
 use frontier_template_runtime::{opaque::Block, AccountId, Balance, Hash, Nonce};
 
 mod eth;
-pub use self::eth::{create_eth, overrides_handle, EthDeps};
+pub use self::eth::{create_eth, overrides_handle, EthDeps, TracingConfig, TracingSpawnTasksParams};
 
 /// Full client dependencies.
 pub struct FullDeps<C, P, A: ChainApi, CT, CIDP> {
@@ -70,6 +70,8 @@ where
 	C::Api: pallet_transaction_payment_rpc::TransactionPaymentRuntimeApi<Block, Balance>,
 	C::Api: fp_rpc::ConvertTransactionRuntimeApi<Block>,
 	C::Api: fp_rpc::EthereumRuntimeRPCApi<Block>,
+	C::Api: fp_rpc_debug::DebugRuntimeApi<Block>,
+	C::Api: fp_rpc_txpool::TxPoolRuntimeApi<Block>,
 	C: HeaderBackend<Block> + HeaderMetadata<Block, Error = BlockChainError> + 'static,
 	C: BlockchainEvents<Block> + AuxStore + UsageProvider<Block> + StorageProvider<Block, BE>,
 	BE: Backend<Block> + 'static,

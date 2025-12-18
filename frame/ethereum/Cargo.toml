@@ -14,7 +14,7 @@ targets = ["x86_64-unknown-linux-gnu"]
 ethereum = { workspace = true, features = ["with-codec"] }
 ethereum-types = { workspace = true }
 evm = { workspace = true, features = ["with-codec"] }
-scale-codec = { package = "parity-scale-codec", workspace = true }
+scale-codec = { workspace = true }
 scale-info = { workspace = true }
 # Substrate
 frame-support = { workspace = true }
@@ -29,6 +29,7 @@ fp-evm = { workspace = true }
 fp-rpc = { workspace = true }
 fp-storage = { workspace = true }
 pallet-evm = { workspace = true }
+fp-rent = { workspace = true }
 
 [dev-dependencies]
 hex = { workspace = true }
@@ -64,6 +65,7 @@ std = [
 	"fp-self-contained/std",
 	"fp-storage/std",
 	"pallet-evm/std",
+	"fp-rent/std",
 ]
 runtime-benchmarks = [
 	"frame-support/runtime-benchmarks",

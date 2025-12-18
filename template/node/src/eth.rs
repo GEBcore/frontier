@@ -3,6 +3,7 @@ use std::{
 	path::PathBuf,
 	sync::{Arc, Mutex},
 	time::Duration,
+	str::FromStr
 };
 
 use futures::{future, prelude::*};
@@ -26,6 +27,26 @@ pub type FrontierBackend = fc_db::Backend<Block>;
 
 pub fn db_config_dir(config: &Configuration) -> PathBuf {
 	config.base_path.config_dir(config.chain_spec.id())
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum EthApi {
+	Txpool,
+	Debug,
+	Trace,
+}
+
+impl FromStr for EthApi {
+	type Err = String;
+
+	fn from_str(s: &str) -> Result<Self, Self::Err> {
+		Ok(match s {
+			"txpool" => Self::Txpool,
+			"debug" => Self::Debug,
+			"trace" => Self::Trace,
+			_ => return Err(format!("`{}` is not recognized as a supported Ethereum Api", s)),
+		})
+	}
 }
 
 /// Avalailable frontier backend types.
@@ -89,6 +110,32 @@ pub struct EthConfiguration {
 	/// Default value is 200MB.
 	#[arg(long, default_value = "209715200")]
 	pub frontier_sql_backend_cache_size: u64,
+
+	/// Enable EVM tracing & Txpool module. ex) --ethapi=debug,trace,txpool
+	#[arg(long, value_delimiter = ',')]
+	pub ethapi: Vec<EthApi>,
+
+	/// Number of concurrent tracing tasks.
+	#[arg(long, default_value = "500")]
+	pub ethapi_max_permits: u32,
+
+	/// Maximum number of trace entries a single request of `trace_filter` is allowed to return.
+	#[arg(long, default_value = "500")]
+	pub ethapi_trace_max_count: u32,
+
+	/// Duration (in seconds) after which the cache of `trace_filter` for a given block will be
+	/// discarded.
+	#[arg(long, default_value = "300")]
+	pub ethapi_trace_cache_duration: u64,
+
+	/// Size in bytes of data a raw tracing request is allowed to use.
+	/// Bound the size of memory, stack and storage data.
+	#[arg(long, default_value = "20000000")]
+	pub tracing_raw_max_memory_usage: usize,
+
+	/// Timeout for eth logs query RPCs in seconds. (default 10)
+	#[arg(long, default_value = "10")]
+	pub logs_request_timeout: u64,
 }
 
 pub struct FrontierPartialComponents {
@@ -112,6 +159,8 @@ pub trait EthCompatRuntimeApiCollection:
 	sp_api::ApiExt<Block>
 	+ fp_rpc::ConvertTransactionRuntimeApi<Block>
 	+ fp_rpc::EthereumRuntimeRPCApi<Block>
+	+ fp_rpc_debug::DebugRuntimeApi<Block>
+	+ fp_rpc_txpool::TxPoolRuntimeApi<Block>
 {
 }
 
@@ -119,6 +168,8 @@ impl<Api> EthCompatRuntimeApiCollection for Api where
 	Api: sp_api::ApiExt<Block>
 		+ fp_rpc::ConvertTransactionRuntimeApi<Block>
 		+ fp_rpc::EthereumRuntimeRPCApi<Block>
+		+ fp_rpc_debug::DebugRuntimeApi<Block>
+		+ fp_rpc_txpool::TxPoolRuntimeApi<Block>
 {
 }
 

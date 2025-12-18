@@ -103,6 +103,8 @@ pub use fp_evm::{
 	PrecompileOutput, PrecompileResult, PrecompileSet, TransactionValidationError, Vicinity,
 };
 
+pub use fp_rent::EvmRentCalculator;
+
 pub use self::{
 	pallet::*,
 	runner::{Runner, RunnerError},
@@ -175,6 +177,9 @@ pub mod pallet {
 		/// Get the timestamp for the current block.
 		type Timestamp: Time;
 
+		/// Charge(Burn) evm rent
+		type EvmRentCalculator: EvmRentCalculator;
+
 		/// Weight information for extrinsics in this pallet.
 		type WeightInfo: WeightInfo;
 
@@ -210,8 +215,8 @@ pub mod pallet {
 		/// Issue an EVM call operation. This is similar to a message call transaction in Ethereum.
 		#[pallet::call_index(1)]
 		#[pallet::weight({
-			let without_base_extrinsic_weight = true;
-			T::GasWeightMapping::gas_to_weight(*gas_limit, without_base_extrinsic_weight)
+		let without_base_extrinsic_weight = true;
+		T::GasWeightMapping::gas_to_weight(*gas_limit, without_base_extrinsic_weight)
 		})]
 		pub fn call(
 			origin: OriginFor<T>,
@@ -287,8 +292,8 @@ pub mod pallet {
 		/// Ethereum.
 		#[pallet::call_index(2)]
 		#[pallet::weight({
-			let without_base_extrinsic_weight = true;
-			T::GasWeightMapping::gas_to_weight(*gas_limit, without_base_extrinsic_weight)
+		let without_base_extrinsic_weight = true;
+		T::GasWeightMapping::gas_to_weight(*gas_limit, without_base_extrinsic_weight)
 		})]
 		pub fn create(
 			origin: OriginFor<T>,
@@ -373,8 +378,8 @@ pub mod pallet {
 		/// Issue an EVM create2 operation.
 		#[pallet::call_index(3)]
 		#[pallet::weight({
-			let without_base_extrinsic_weight = true;
-			T::GasWeightMapping::gas_to_weight(*gas_limit, without_base_extrinsic_weight)
+		let without_base_extrinsic_weight = true;
+		T::GasWeightMapping::gas_to_weight(*gas_limit, without_base_extrinsic_weight)
 		})]
 		pub fn create2(
 			origin: OriginFor<T>,
@@ -500,6 +505,8 @@ pub mod pallet {
 		Reentrancy,
 		/// EIP-3607,
 		TransactionMustComeFromEOA,
+		/// Insufficient Rent + Fee + Value
+		InsufficientRent,
 		/// Undefined error.
 		Undefined,
 	}
@@ -517,6 +524,7 @@ pub mod pallet {
 				TransactionValidationError::InvalidFeeInput => Error::<T>::GasPriceTooLow,
 				TransactionValidationError::InvalidChainId => Error::<T>::InvalidChainId,
 				TransactionValidationError::InvalidSignature => Error::<T>::InvalidSignature,
+				TransactionValidationError::InsufficientRent => Error::InsufficientRent,
 				TransactionValidationError::UnknownError => Error::<T>::Undefined,
 			}
 		}
@@ -532,8 +540,8 @@ pub mod pallet {
 
 	#[pallet::genesis_build]
 	impl<T: Config> BuildGenesisConfig for GenesisConfig<T>
-	where
-		U256: UniqueSaturatedInto<BalanceOf<T>>,
+		where
+			U256: UniqueSaturatedInto<BalanceOf<T>>,
 	{
 		fn build(&self) {
 			const MAX_ACCOUNT_NONCE: usize = 100;
@@ -566,34 +574,40 @@ pub mod pallet {
 
 	#[pallet::storage]
 	pub type AccountCodesMetadata<T: Config> =
-		StorageMap<_, Blake2_128Concat, H160, CodeMetadata, OptionQuery>;
+	StorageMap<_, Blake2_128Concat, H160, CodeMetadata, OptionQuery>;
 
 	#[pallet::storage]
 	pub type AccountStorages<T: Config> =
-		StorageDoubleMap<_, Blake2_128Concat, H160, Blake2_128Concat, H256, H256, ValueQuery>;
+	StorageDoubleMap<_, Blake2_128Concat, H160, Blake2_128Concat, H256, H256, ValueQuery>;
 
 	#[pallet::storage]
 	pub type Suicided<T: Config> = StorageMap<_, Blake2_128Concat, H160, (), OptionQuery>;
+
+	// Unique,BEVM:
+	/// Written on log, reset after transaction
+	/// Should be empty between transactions
+	#[pallet::storage]
+	pub type CurrentLogs<T: Config> = StorageValue<_, Vec<Log>, ValueQuery>;
 }
 
 /// Type alias for currency balance.
 pub type BalanceOf<T> =
-	<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 
 /// Type alias for negative imbalance during fees
 type NegativeImbalanceOf<C, T> =
-	<C as Currency<<T as frame_system::Config>::AccountId>>::NegativeImbalance;
+<C as Currency<<T as frame_system::Config>::AccountId>>::NegativeImbalance;
 
 #[derive(
-	Debug,
-	Clone,
-	Copy,
-	Eq,
-	PartialEq,
-	Encode,
-	Decode,
-	TypeInfo,
-	MaxEncodedLen
+Debug,
+Clone,
+Copy,
+Eq,
+PartialEq,
+Encode,
+Decode,
+TypeInfo,
+MaxEncodedLen
 )]
 pub struct CodeMetadata {
 	pub size: u64,
@@ -633,8 +647,8 @@ pub trait EnsureAddressOrigin<OuterOrigin> {
 pub struct EnsureAddressSame;
 
 impl<OuterOrigin> EnsureAddressOrigin<OuterOrigin> for EnsureAddressSame
-where
-	OuterOrigin: Into<Result<RawOrigin<H160>, OuterOrigin>> + From<RawOrigin<H160>>,
+	where
+		OuterOrigin: Into<Result<RawOrigin<H160>, OuterOrigin>> + From<RawOrigin<H160>>,
 {
 	type Success = H160;
 
@@ -650,8 +664,8 @@ where
 pub struct EnsureAddressRoot<AccountId>(sp_std::marker::PhantomData<AccountId>);
 
 impl<OuterOrigin, AccountId> EnsureAddressOrigin<OuterOrigin> for EnsureAddressRoot<AccountId>
-where
-	OuterOrigin: Into<Result<RawOrigin<AccountId>, OuterOrigin>> + From<RawOrigin<AccountId>>,
+	where
+		OuterOrigin: Into<Result<RawOrigin<AccountId>, OuterOrigin>> + From<RawOrigin<AccountId>>,
 {
 	type Success = ();
 
@@ -679,8 +693,8 @@ impl<OuterOrigin, AccountId> EnsureAddressOrigin<OuterOrigin> for EnsureAddressN
 pub struct EnsureAddressTruncated;
 
 impl<OuterOrigin> EnsureAddressOrigin<OuterOrigin> for EnsureAddressTruncated
-where
-	OuterOrigin: Into<Result<RawOrigin<AccountId32>, OuterOrigin>> + From<RawOrigin<AccountId32>>,
+	where
+		OuterOrigin: Into<Result<RawOrigin<AccountId32>, OuterOrigin>> + From<RawOrigin<AccountId32>>,
 {
 	type Success = AccountId32;
 
@@ -698,8 +712,8 @@ where
 pub struct EnsureAccountId20;
 
 impl<OuterOrigin> EnsureAddressOrigin<OuterOrigin> for EnsureAccountId20
-where
-	OuterOrigin: Into<Result<RawOrigin<AccountId20>, OuterOrigin>> + From<RawOrigin<AccountId20>>,
+	where
+		OuterOrigin: Into<Result<RawOrigin<AccountId20>, OuterOrigin>> + From<RawOrigin<AccountId20>>,
 {
 	type Success = AccountId20;
 
@@ -820,7 +834,7 @@ impl<T: Config> Pallet<T> {
 
 		if T::SuicideQuickClearLimit::get() > 0 {
 			#[allow(deprecated)]
-			let res = <AccountStorages<T>>::remove_prefix(address, Some(T::SuicideQuickClearLimit::get()));
+				let res = <AccountStorages<T>>::remove_prefix(address, Some(T::SuicideQuickClearLimit::get()));
 
 			match res {
 				KillStorageResult::AllRemoved(_) => {
@@ -858,6 +872,22 @@ impl<T: Config> Pallet<T> {
 		<AccountCodesMetadata<T>>::insert(address, meta);
 
 		<AccountCodes<T>>::insert(address, code);
+	}
+
+	// Unique,BEVM:
+	/// Add log to be injected in either real or fake ethereum transaction
+	pub fn deposit_log(log: Log) {
+		log::trace!(
+			target: "evm",
+			"Inserting mirrored log for {:?}, topics ({}) {:?}, data ({}): {:?}]",
+			log.address,
+			log.topics.len(),
+			log.topics,
+			log.data.len(),
+			log.data
+		);
+		<CurrentLogs<T>>::append(log);
+		// Log event is not emitted here, as these logs belong to pallets, which will emit pallet-specific logs on substrate side by themselves
 	}
 
 	/// Get the account metadata (hash and size) from storage if it exists,
@@ -946,35 +976,71 @@ pub trait OnChargeEVMTransaction<T: Config> {
 pub struct EVMCurrencyAdapter<C, OU>(sp_std::marker::PhantomData<(C, OU)>);
 
 impl<T, C, OU> OnChargeEVMTransaction<T> for EVMCurrencyAdapter<C, OU>
-where
-	T: Config,
-	C: Currency<<T as frame_system::Config>::AccountId>,
-	C::PositiveImbalance: Imbalance<
-		<C as Currency<<T as frame_system::Config>::AccountId>>::Balance,
-		Opposite = C::NegativeImbalance,
-	>,
-	C::NegativeImbalance: Imbalance<
-		<C as Currency<<T as frame_system::Config>::AccountId>>::Balance,
-		Opposite = C::PositiveImbalance,
-	>,
-	OU: OnUnbalanced<NegativeImbalanceOf<C, T>>,
-	U256: UniqueSaturatedInto<<C as Currency<<T as frame_system::Config>::AccountId>>::Balance>,
+	where
+		T: Config,
+		C: Currency<<T as frame_system::Config>::AccountId>,
+		C::PositiveImbalance: Imbalance<
+			<C as Currency<<T as frame_system::Config>::AccountId>>::Balance,
+			Opposite = C::NegativeImbalance,
+		>,
+		C::NegativeImbalance: Imbalance<
+			<C as Currency<<T as frame_system::Config>::AccountId>>::Balance,
+			Opposite = C::PositiveImbalance,
+		>,
+		OU: OnUnbalanced<NegativeImbalanceOf<C, T>>,
+		U256: UniqueSaturatedInto<<C as Currency<<T as frame_system::Config>::AccountId>>::Balance>,
 {
 	// Kept type as Option to satisfy bound of Default
 	type LiquidityInfo = Option<NegativeImbalanceOf<C, T>>;
 
 	fn withdraw_fee(who: &H160, fee: U256) -> Result<Self::LiquidityInfo, Error<T>> {
+		// ====================================================
+		// Handle EVM Rent (burn logic)
+
+		// 1. H160 -> T::AccountId
+		let account_id = T::AddressMapping::into_account_id(*who);
+
+		// 2. call process_rent get rent to burn and update state
+		let rent_to_burn_u128 = T::EvmRentCalculator::process_rent(*who);
+		if rent_to_burn_u128 > 0 {
+			let rent_balance: C::Balance = rent_to_burn_u128.unique_saturated_into();
+
+			// Withdraw
+			// WithdrawReasons::FEE
+			// ExistenceRequirement::AllowDeath
+			match C::withdraw(
+				&account_id,
+				rent_balance,
+				WithdrawReasons::FEE,
+				ExistenceRequirement::AllowDeath
+			) {
+				Ok(rent_imbalance) => {
+					// !!! KeyPoint: Burn !!!
+					// rent_imbalance is NegativeImbalance
+					// We don't call resolve_creating or deposit_into_existing.
+					// We do nothing and just let it drop here.
+					// Substrate automatically reduces TotalIssuance when rent_imbalance goes out of scope.
+					drop(rent_imbalance);
+				},
+				Err(_) => {
+					// The transaction fails if the balance is insufficient to pay the rent.
+					return Err(Error::<T>::BalanceLow);
+				}
+			}
+		}
+		// ====================================================
+
 		if fee.is_zero() {
 			return Ok(None);
 		}
-		let account_id = T::AddressMapping::into_account_id(*who);
+
 		let imbalance = C::withdraw(
 			&account_id,
 			fee.unique_saturated_into(),
 			WithdrawReasons::FEE,
 			ExistenceRequirement::AllowDeath,
 		)
-		.map_err(|_| Error::<T>::BalanceLow)?;
+			.map_err(|_| Error::<T>::BalanceLow)?;
 		Ok(Some(imbalance))
 	}
 
@@ -1041,12 +1107,12 @@ where
 /// Implementation for () does not specify what to do with imbalance
 impl<T> OnChargeEVMTransaction<T> for ()
 	where
-	T: Config,
-	<T::Currency as Currency<<T as frame_system::Config>::AccountId>>::PositiveImbalance:
+		T: Config,
+		<T::Currency as Currency<<T as frame_system::Config>::AccountId>>::PositiveImbalance:
 		Imbalance<<T::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance, Opposite = <T::Currency as Currency<<T as frame_system::Config>::AccountId>>::NegativeImbalance>,
-	<T::Currency as Currency<<T as frame_system::Config>::AccountId>>::NegativeImbalance:
-Imbalance<<T::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance, Opposite = <T::Currency as Currency<<T as frame_system::Config>::AccountId>>::PositiveImbalance>,
-U256: UniqueSaturatedInto<BalanceOf<T>>,
+		<T::Currency as Currency<<T as frame_system::Config>::AccountId>>::NegativeImbalance:
+		Imbalance<<T::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance, Opposite = <T::Currency as Currency<<T as frame_system::Config>::AccountId>>::PositiveImbalance>,
+		U256: UniqueSaturatedInto<BalanceOf<T>>,
 
 {
 	// Kept type as Option to satisfy bound of Default

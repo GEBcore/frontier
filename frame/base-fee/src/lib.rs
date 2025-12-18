@@ -96,6 +96,9 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type BaseFeePerGas<T> = StorageValue<_, U256, ValueQuery, DefaultBaseFeePerGas<T>>;
 
+	#[pallet::storage]
+	pub type InitBaseFeePerGas<T> = StorageValue<_, U256, ValueQuery, DefaultBaseFeePerGas<T>>;
+
 	#[pallet::type_value]
 	pub fn DefaultElasticity<T: Config>() -> Permill {
 		T::DefaultElasticity::get()
@@ -110,6 +113,7 @@ pub mod pallet {
 		NewBaseFeePerGas { fee: U256 },
 		BaseFeeOverflow,
 		NewElasticity { elasticity: Permill },
+		NewInitBaseFeePerGas { fee: U256 }
 	}
 
 	#[pallet::hooks]
@@ -178,7 +182,7 @@ pub mod pallet {
 						let decrease = scaled_basefee
 							.checked_div(U256::from(1_000_000))
 							.unwrap_or_else(U256::zero);
-						let default_base_fee = T::DefaultBaseFeePerGas::get();
+						let default_base_fee = InitBaseFeePerGas::<T>::get();
 						// lowest fee is norm(DefaultBaseFeePerGas * Threshold::ideal()):
 						let lowest_base_fee = default_base_fee
 							.checked_mul(U256::from(T::Threshold::ideal().deconstruct()))
@@ -217,6 +221,15 @@ pub mod pallet {
 			Self::deposit_event(Event::NewElasticity { elasticity });
 			Ok(())
 		}
+
+		#[pallet::call_index(2)]
+		#[pallet::weight(10_000 + T::DbWeight::get().writes(1).ref_time())]
+		pub fn set_init_base_fee_per_gas(origin: OriginFor<T>, fee: U256) -> DispatchResult {
+			ensure_root(origin)?;
+			let _ = Self::set_init_base_fee_per_gas_inner(fee);
+			Self::deposit_event(Event::NewInitBaseFeePerGas { fee });
+			Ok(())
+		}
 	}
 }
 
@@ -233,6 +246,10 @@ impl<T: Config> Pallet<T> {
 	}
 	pub fn set_elasticity_inner(value: Permill) -> Weight {
 		<Elasticity<T>>::put(value);
+		T::DbWeight::get().writes(1)
+	}
+	pub fn set_init_base_fee_per_gas_inner(value: U256) -> Weight {
+		<InitBaseFeePerGas<T>>::put(value);
 		T::DbWeight::get().writes(1)
 	}
 }

@@ -19,11 +19,12 @@ futures = { workspace = true }
 hex-literal = { workspace = true }
 jsonrpsee = { workspace = true, features = ["server", "macros"] }
 log = { workspace = true }
-scale-codec = { package = "parity-scale-codec", workspace = true }
+scale-codec = { workspace = true }
 serde = { workspace = true }
+tokio = { workspace = true, features = ["macros", "sync"] }
 
 # Substrate
-prometheus-endpoint = { package = "substrate-prometheus-endpoint", workspace = true }
+prometheus-endpoint = { workspace = true }
 sc-basic-authorship = { workspace = true }
 sc-chain-spec = { workspace = true }
 sc-cli = { workspace = true }
@@ -64,6 +65,7 @@ substrate-frame-rpc-system = { workspace = true }
 frame-benchmarking = { workspace = true, optional = true }
 frame-benchmarking-cli = { workspace = true, optional = true }
 frame-system = { workspace = true }
+pallet-ethereum = { workspace = true }
 pallet-transaction-payment = { workspace = true }
 
 # Frontier
@@ -72,7 +74,7 @@ fc-cli = { workspace = true }
 fc-consensus = { workspace = true }
 fc-db = { workspace = true }
 fc-mapping-sync = { workspace = true }
-fc-rpc = { workspace = true }
+fc-rpc = { workspace = true, features = ["rpc-binary-search-estimate"] }
 fc-rpc-core = { workspace = true }
 fc-storage = { workspace = true }
 fp-account = { workspace = true }
@@ -80,6 +82,13 @@ fp-dynamic-fee = { workspace = true, features = ["default"] }
 fp-evm = { workspace = true, features = ["default"] }
 fp-rpc = { workspace = true, features = ["default"] }
 frontier-template-runtime = { workspace = true, features = ["std"] }
+
+fp-ext = { workspace = true, features = ["std"] }
+fp-rpc-debug = { workspace = true, features = ["std"] }
+fp-rpc-txpool = { workspace = true, features = ["std"] }
+fc-rpc-debug = { workspace = true }
+fc-rpc-trace = { workspace = true }
+fc-rpc-txpool = { workspace = true }
 
 [build-dependencies]
 substrate-build-script-utils = { workspace = true }
@@ -89,7 +98,6 @@ default = [
 	"with-rocksdb-weights",
 	"rocksdb",
 	"sql",
-	"txpool",
 ]
 rocksdb = [
 	"sc-cli/rocksdb",
@@ -105,11 +113,12 @@ sql = [
 ]
 with-rocksdb-weights = ["frontier-template-runtime/with-rocksdb-weights"]
 with-paritydb-weights = ["frontier-template-runtime/with-paritydb-weights"]
-txpool = ["fc-rpc/txpool"]
 rpc-binary-search-estimate = ["fc-rpc/rpc-binary-search-estimate"]
 runtime-benchmarks = [
 	"frame-benchmarking/runtime-benchmarks",
 	"frame-benchmarking-cli/runtime-benchmarks",
 	"sc-service/runtime-benchmarks",
 	"frontier-template-runtime/runtime-benchmarks",
+	"pallet-ethereum/runtime-benchmarks",
 ]
+evm-tracing = ["frontier-template-runtime/evm-tracing"]

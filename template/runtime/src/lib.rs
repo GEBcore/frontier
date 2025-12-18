@@ -38,6 +38,7 @@ use frame_support::{
 	traits::{ConstBool, ConstU32, ConstU8, FindAuthor, OnFinalize, OnTimestampSet},
 	weights::{constants::WEIGHT_REF_TIME_PER_MILLIS, IdentityFee, Weight},
 };
+use frame_system::EnsureRoot;
 use pallet_grandpa::{
 	fg_primitives, AuthorityId as GrandpaId, AuthorityList as GrandpaAuthorityList,
 };
@@ -349,6 +350,7 @@ impl pallet_evm::Config for Runtime {
 	type GasLimitPovSizeRatio = GasLimitPovSizeRatio;
 	type SuicideQuickClearLimit = SuicideQuickClearLimit;
 	type Timestamp = Timestamp;
+	type EvmRentCalculator = EvmRent;
 	type WeightInfo = pallet_evm::weights::SubstrateWeight<Self>;
 }
 
@@ -401,6 +403,11 @@ impl pallet_hotfix_sufficients::Config for Runtime {
 	type WeightInfo = pallet_hotfix_sufficients::weights::SubstrateWeight<Self>;
 }
 
+impl pallet_evm_rent::Config for Runtime {
+	type RuntimeEvent = RuntimeEvent;
+	type CouncilOrigin = EnsureRoot<AccountId>;
+}
+
 // Create the runtime by composing the FRAME pallets that were previously configured.
 construct_runtime!(
 	pub enum Runtime {
@@ -417,6 +424,7 @@ construct_runtime!(
 		DynamicFee: pallet_dynamic_fee,
 		BaseFee: pallet_base_fee,
 		HotfixSufficients: pallet_hotfix_sufficients,
+		EvmRent: pallet_evm_rent,
 	}
 );
 
@@ -465,6 +473,7 @@ pub type SignedExtra = (
 	frame_system::CheckNonce<Runtime>,
 	frame_system::CheckWeight<Runtime>,
 	pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
+	pallet_ethereum::FakeTransactionFinalizer<Runtime>,
 );
 /// Unchecked extrinsic type as expected by this runtime.
 pub type UncheckedExtrinsic =
@@ -823,6 +832,103 @@ impl_runtime_apis! {
 				pallet_ethereum::CurrentBlock::<Runtime>::get(),
 				pallet_ethereum::CurrentTransactionStatuses::<Runtime>::get()
 			)
+		}
+	}
+
+	impl fp_rpc_debug::DebugRuntimeApi<Block> for Runtime {
+		fn trace_transaction(
+			extrinsics: Vec<<Block as BlockT>::Extrinsic>,
+			traced_transaction: &EthereumTransaction,
+		) -> Result<
+			(),
+			sp_runtime::DispatchError,
+		> {
+			#[cfg(feature = "evm-tracing")]
+			{
+				use evm_tracer::tracer::EvmTracer;
+				// Apply the a subset of extrinsics: all the substrate-specific or ethereum
+				// transactions that preceded the requested transaction.
+				for ext in extrinsics.into_iter() {
+					let _ = match &ext.0.function {
+						RuntimeCall::Ethereum(transact { transaction }) => {
+							if transaction == traced_transaction {
+								EvmTracer::new().trace(|| Executive::apply_extrinsic(ext));
+								return Ok(());
+							} else {
+								Executive::apply_extrinsic(ext)
+							}
+						}
+						_ => Executive::apply_extrinsic(ext),
+					};
+				}
+				Err(sp_runtime::DispatchError::Other(
+					"Failed to find Ethereum transaction among the extrinsics.",
+				))
+			}
+			#[cfg(not(feature = "evm-tracing"))]
+			Err(sp_runtime::DispatchError::Other(
+				"Missing `evm-tracing` compile time feature flag.",
+			))
+		}
+		fn trace_block(
+			extrinsics: Vec<<Block as BlockT>::Extrinsic>,
+			known_transactions: Vec<H256>,
+		) -> Result<
+			(),
+			sp_runtime::DispatchError,
+		> {
+			#[cfg(feature = "evm-tracing")]
+			{
+				use evm_tracer::tracer::EvmTracer;
+				let mut config = <Runtime as pallet_evm::Config>::config().clone();
+				config.estimate = true;
+				// Apply all extrinsics. Ethereum extrinsics are traced.
+				for ext in extrinsics.into_iter() {
+					match &ext.0.function {
+						RuntimeCall::Ethereum(transact { transaction }) => {
+							if known_transactions.contains(&transaction.hash()) {
+								// Each known extrinsic is a new call stack.
+								EvmTracer::emit_new();
+								EvmTracer::new().trace(|| Executive::apply_extrinsic(ext));
+							} else {
+								let _ = Executive::apply_extrinsic(ext);
+							}
+						}
+						_ => {
+							let _ = Executive::apply_extrinsic(ext);
+						}
+					};
+				}
+				Ok(())
+			}
+			#[cfg(not(feature = "evm-tracing"))]
+			Err(sp_runtime::DispatchError::Other(
+				"Missing `evm-tracing` compile time feature flag.",
+			))
+		}
+	}
+
+	impl fp_rpc_txpool::TxPoolRuntimeApi<Block> for Runtime {
+		fn extrinsic_filter(
+			xts_ready: Vec<<Block as BlockT>::Extrinsic>,
+			xts_future: Vec<<Block as BlockT>::Extrinsic>,
+		) -> fp_rpc_txpool::TxPoolResponse {
+			fp_rpc_txpool::TxPoolResponse {
+				ready: xts_ready
+				.into_iter()
+				.filter_map(|xt| match xt.0.function {
+					RuntimeCall::Ethereum(transact { transaction }) => Some(transaction),
+					_ => None,
+				})
+				.collect(),
+				future: xts_future
+				.into_iter()
+				.filter_map(|xt| match xt.0.function {
+					RuntimeCall::Ethereum(transact { transaction }) => Some(transaction),
+					_ => None,
+				})
+				.collect(),
+			}
 		}
 	}
 
